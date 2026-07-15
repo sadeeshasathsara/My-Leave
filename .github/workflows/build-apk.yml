@@ -37,6 +37,24 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Generate Android folder (Prebuild)
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Configure Debug Signing for Release Build
+        run: |
+          node -e "
+            const fs = require('fs');
+            const file = 'android/app/build.gradle';
+            let content = fs.readFileSync(file, 'utf8');
+            if (content.includes('signingConfig signingConfigs.debug')) {
+              console.log('Signing config already present.');
+            } else {
+              content = content.replace(/release\s*\{/, 'release {\n            signingConfig signingConfigs.debug');
+              fs.writeFileSync(file, content);
+              console.log('Signing config patched successfully.');
+            }
+          "
+
       - name: Build Android Release APK
         run: |
           cd android
