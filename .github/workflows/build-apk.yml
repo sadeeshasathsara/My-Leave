@@ -12,6 +12,9 @@ jobs:
     name: Build Android APK
     runs-on: ubuntu-latest
 
+    outputs:
+      package-name: com.sadeeshasathsra.myleave
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,6 +27,26 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Fail on canary/prerelease dependencies
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+            const bad = Object.entries(deps).filter(([name, version]) =>
+              /canary|alpha|beta|rc|next|nightly/i.test(version)
+            );
+            if (bad.length) {
+              console.error('Prerelease dependencies found (these can be incompatible with your Expo SDK):');
+              bad.forEach(([name, version]) => console.error('  ' + name + '@' + version));
+              process.exit(1);
+            } else {
+              console.log('No prerelease dependencies found.');
+            }
+          "
+
+      - name: Check Expo project health
+        run: npx expo-doctor
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -86,3 +109,38 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
+
+  smoke-test:
+    name: Smoke test APK on emulator
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: my-leave-apk
+
+      - name: Enable KVM for emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run emulator, install APK, and check it launches
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            adb install app-release.apk
+            adb shell monkey -p com.sadeeshasathsra.myleave -c android.intent.category.LAUNCHER 1
+            sleep 8
+            if adb shell pidof com.sadeeshasathsra.myleave; then
+              echo "App launched successfully"
+            else
+              echo "App crashed on launch"
+              adb logcat -d | grep -A 50 "FATAL EXCEPTION" || true
+              exit 1
+            fi
