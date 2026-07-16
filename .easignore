@@ -1,0 +1,12 @@
+# Files to ignore during EAS builds
+# By default, EAS CLI uses .gitignore. Since google-services.json is in .gitignore,
+# we need an explicit .easignore so EAS uploads google-services.json to the cloud build.
+
+node_modules/
+.expo/
+dist/
+web-build/
+ios/
+android/
+*.jks
+*.keystore

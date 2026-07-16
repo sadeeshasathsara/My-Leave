@@ -40,6 +40,25 @@ jobs:
       - name: Generate Android folder (Prebuild)
         run: npx expo prebuild --platform android --no-install
 
+      # REQUIRED: google-services.json must be stored as a base64-encoded GitHub secret.
+      # To set it up:
+      #   1. Get your google-services.json from Firebase Console > Project Settings > Your Android App
+      #   2. Encode it: cat android/app/google-services.json | base64  (Linux/Mac)
+      #      OR on Windows PowerShell:
+      #      [Convert]::ToBase64String([IO.File]::ReadAllBytes("path\to\google-services.json"))
+      #   3. Add the output as a GitHub secret named GOOGLE_SERVICES_JSON
+      - name: Inject google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "ERROR: GOOGLE_SERVICES_JSON secret is not set. The app will crash on launch without it."
+            echo "Please add it in: GitHub repo > Settings > Secrets and variables > Actions > New repository secret"
+            exit 1
+          fi
+          echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+          echo "google-services.json injected successfully."
+
       - name: Configure Debug Signing for Release Build
         run: |
           node -e "

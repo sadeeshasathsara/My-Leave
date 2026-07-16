@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.sadeeshasathsara.myleave",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0f172a",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
