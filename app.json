@@ -9,10 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.sadeeshasathsara.myleave"
+      "bundleIdentifier": "com.sadeeshasathsra.myleave"
     },
     "android": {
-      "package": "com.sadeeshasathsara.myleave",
+      "package": "com.sadeeshasathsra.myleave",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0f172a",
