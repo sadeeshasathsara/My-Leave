@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { databaseService } from '../services/database';
 import { LeaveRecord, UserSettings, LeaveType, DashboardStats } from '../types';
+import { registerBackgroundBackupTask, unregisterBackgroundBackupTask } from '../services/background-backup';
+
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -69,6 +71,7 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
       Casual: 10,
       Vacation: 15,
       Duty: 5,
+      'Half Day': 10,
     },
     backupEnabled: false,
     lastBackup: null,
@@ -170,6 +173,13 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
     try {
       await databaseService.saveSettings(updatedSettings);
       set({ settings: updatedSettings });
+
+      // Auto-register/unregister daily background backup task
+      if (updatedSettings.hasOnboarded && updatedSettings.backupEnabled) {
+        registerBackgroundBackupTask();
+      } else {
+        unregisterBackgroundBackupTask();
+      }
     } catch (error) {
       console.error('Error saving settings:', error);
     }
@@ -183,6 +193,13 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
         leaves: backupLeaves,
         settings: backupSettings,
       });
+
+      // Auto-register/unregister backup task after restore
+      if (backupSettings.hasOnboarded && backupSettings.backupEnabled) {
+        registerBackgroundBackupTask();
+      } else {
+        unregisterBackgroundBackupTask();
+      }
     } catch (error) {
       console.error('Error restoring backup data:', error);
       throw error;
@@ -193,6 +210,7 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
     try {
       // 1. Sign out of Google Sign-in if native libraries are supported
       try {
+        await unregisterBackgroundBackupTask();
         const { NativeModules } = require('react-native');
         if (NativeModules && NativeModules.RNGoogleSignin) {
           const GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
@@ -216,6 +234,7 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
           Casual: 10,
           Vacation: 15,
           Duty: 5,
+          'Half Day': 10,
         },
         backupEnabled: false,
         lastBackup: null,
@@ -268,7 +287,7 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
    */
   getMonthStats: (year: number, month: number) => {
     const { leaves } = get();
-    const byType: Record<LeaveType, number> = { Casual: 0, Vacation: 0, Duty: 0 };
+    const byType: Record<LeaveType, number> = { Casual: 0, Vacation: 0, Duty: 0, 'Half Day': 0 };
 
     leaves.forEach((leave) => {
       const d = new Date(leave.date);
@@ -295,13 +314,16 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
       return leaveYear === targetYear;
     });
 
-    const totalTakenThisYear = activeLeavesThisYear.length;
+    const totalTakenThisYear = activeLeavesThisYear.reduce((acc, leave) => {
+      return acc + (leave.type === 'Half Day' ? 0.5 : 1);
+    }, 0);
 
-    // Group leaves by type
+    // Group leaves by type (counting 1 entry as 1 logged half day, as requested)
     const byType: Record<LeaveType, number> = {
       Casual: 0,
       Vacation: 0,
       Duty: 0,
+      'Half Day': 0,
     };
 
     activeLeavesThisYear.forEach((leave) => {
@@ -314,6 +336,7 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
     const remainingCasual = Math.max(0, settings.allocations.Casual - byType['Casual']);
     const remainingVacation = Math.max(0, settings.allocations.Vacation - byType['Vacation']);
     const remainingDuty = Math.max(0, settings.allocations.Duty - byType['Duty']);
+    const remainingHalfDay = Math.max(0, (settings.allocations['Half Day'] || 10) - byType['Half Day']);
 
     return {
       totalTakenThisYear,
@@ -321,6 +344,7 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
       remainingCasual,
       remainingVacation,
       remainingDuty,
+      remainingHalfDay,
     };
   },
 

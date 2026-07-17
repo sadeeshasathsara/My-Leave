@@ -13,6 +13,8 @@ import * as Notifications from 'expo-notifications';
 import { notificationService } from '../services/notifications';
 import { GoogleUser, LeaveRecord, UserSettings } from '../types';
 import { fs } from '../constants/layout';
+import { registerBackgroundBackupTask } from '../services/background-backup';
+
 
 /** Year dropdown shown in the top-right of every screen header */
 function YearDropdown({ colors }: { colors: typeof Colors.light | typeof Colors.dark }) {
@@ -103,12 +105,17 @@ export default function RootLayout() {
     loadInitialData();
   }, []);
 
-  // Configure notifications and responses once settings are loaded
+  // Configure notifications, background fetch, and responses once settings are loaded
   useEffect(() => {
     if (isLoading) return;
 
     if (settings.hasOnboarded) {
       notificationService.setup();
+      
+      // Auto-register daily background backup task if backup is enabled
+      if (settings.backupEnabled) {
+        registerBackgroundBackupTask();
+      }
     }
 
     const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
@@ -161,6 +168,9 @@ export default function RootLayout() {
     if (restoreData) {
       await restoreFromBackup(restoreData.leaves, {
         ...restoreData.settings,
+        googleUser: userData.googleUser,
+        userName: userData.googleUser?.name || restoreData.settings.userName,
+        email: userData.googleUser?.email || restoreData.settings.email,
         hasOnboarded: true,
       });
     } else {
@@ -245,7 +255,7 @@ export default function RootLayout() {
           options={{
             ...sharedHeaderOptions,
             title: 'Dashboard',
-            headerTitle: 'My Leave Tracker',
+            headerTitle: 'My Leaves Tracker',
             tabBarLabel: 'Home',
             tabBarIcon: ({ color, size, focused }) => (
               <Ionicons name={focused ? 'grid' : 'grid-outline'} size={size} color={color} />

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "my-leave",
+    "name": "My Leaves",
     "slug": "my-leave",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,12 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.sadeeshasathsra.myleave"
+      "bundleIdentifier": "com.sadeeshasathsra.myleave",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "fetch"
+        ]
+      }
     },
     "android": {
       "package": "com.sadeeshasathsra.myleave",
@@ -31,9 +36,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#090d16",
+          "image": "./assets/images/app-logo.png",
+          "imageWidth": 120
         }
       ],
       "@react-native-google-signin/google-signin",

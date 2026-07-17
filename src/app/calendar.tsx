@@ -138,7 +138,7 @@ export default function CalendarScreen() {
         {/* Scrollable Filters */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersScroll}>
           <Text style={[styles.filterTitle, { color: colors.textSecondary }]}>Type:</Text>
-          {(['All', 'Casual', 'Vacation', 'Duty'] as const).map((typeVal) => {
+          {(['All', 'Casual', 'Vacation', 'Duty', 'Half Day'] as const).map((typeVal) => {
             const isSelected = selectedType === typeVal;
             return (
               <Pressable

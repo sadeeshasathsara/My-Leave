@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS: UserSettings = {
     Casual: 10,
     Vacation: 15,
     Duty: 5,
+    'Half Day': 10,
   },
   backupEnabled: false,
   lastBackup: null,
@@ -258,7 +259,15 @@ export const databaseService = {
       if (isWeb) {
         const settingsRaw = localStorage.getItem(WEB_SETTINGS_KEY);
         if (settingsRaw) {
-          return JSON.parse(settingsRaw) as UserSettings;
+          const parsed = JSON.parse(settingsRaw);
+          return {
+            ...DEFAULT_SETTINGS,
+            ...parsed,
+            allocations: {
+              ...DEFAULT_SETTINGS.allocations,
+              ...parsed.allocations,
+            },
+          };
         }
       } else {
         const database = await getDb();
@@ -267,7 +276,15 @@ export const databaseService = {
         );
         const row = rows[0];
         if (row) {
-          return JSON.parse(row.value);
+          const parsed = JSON.parse(row.value);
+          return {
+            ...DEFAULT_SETTINGS,
+            ...parsed,
+            allocations: {
+              ...DEFAULT_SETTINGS.allocations,
+              ...parsed.allocations,
+            },
+          };
         }
       }
       throw new Error('Settings not found');

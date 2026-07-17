@@ -120,6 +120,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: my-leave-apk
+          path: .
 
       - name: Enable KVM for emulator acceleration
         run: |
@@ -137,10 +138,4 @@ jobs:
             adb install app-release.apk
             adb shell monkey -p com.sadeeshasathsra.myleave -c android.intent.category.LAUNCHER 1
             sleep 8
-            if adb shell pidof com.sadeeshasathsra.myleave; then
-              echo "App launched successfully"
-            else
-              echo "App crashed on launch"
-              adb logcat -d | grep -A 50 "FATAL EXCEPTION" || true
-              exit 1
-            fi
+            adb shell pidof com.sadeeshasathsra.myleave && echo "App launched successfully" || (echo "App crashed on launch" && adb logcat -d | grep -A 50 "FATAL EXCEPTION" || true && exit 1)

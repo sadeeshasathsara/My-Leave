@@ -1,4 +1,4 @@
-export type LeaveType = 'Casual' | 'Vacation' | 'Duty';
+export type LeaveType = 'Casual' | 'Vacation' | 'Duty' | 'Half Day';
 
 export interface LeaveRecord {
   id: string;
@@ -12,6 +12,7 @@ export interface LeaveAllocation {
   Casual: number;
   Vacation: number;
   Duty: number;
+  'Half Day': number;
 }
 
 export interface GoogleUser {
@@ -41,4 +42,5 @@ export interface DashboardStats {
   remainingCasual: number;
   remainingVacation: number;
   remainingDuty: number;
+  remainingHalfDay: number;
 }

@@ -23,15 +23,16 @@ export const exportService = {
       Casual: 0,
       Vacation: 0,
       Duty: 0,
+      'Half Day': 0,
     };
 
     sortedLeaves.forEach((leave) => {
       if (stats[leave.type] !== undefined) {
-        stats[leave.type] += 1;
+        stats[leave.type] += 1; // individual count shows as 1 per entry
       }
     });
 
-    const totalTaken = sortedLeaves.length;
+    const totalTaken = sortedLeaves.reduce((acc, leave) => acc + (leave.type === 'Half Day' ? 0.5 : 1), 0);
 
     const formatRow = (leave: LeaveRecord, index: number) => {
       const typeColor = LeaveTypeColors[leave.type] || '#6b7280';
@@ -102,7 +103,7 @@ export const exportService = {
             
             .meta-grid {
               display: grid;
-              grid-template-columns: repeat(4, 1fr);
+              grid-template-columns: repeat(5, 1fr);
               gap: 16px;
               margin-bottom: 30px;
             }
@@ -231,6 +232,10 @@ export const exportService = {
               <div class="label">Duty</div>
               <div class="value">${stats.Duty} Days</div>
             </div>
+            <div class="meta-card">
+              <div class="label">Half Day</div>
+              <div class="value">${stats['Half Day']} Days</div>
+            </div>
           </div>
           
           <h2 class="section-title">Leave History Details</h2>
@@ -319,15 +324,16 @@ export const exportService = {
         Casual: 0,
         Vacation: 0,
         Duty: 0,
+        'Half Day': 0,
       };
 
       yearLeaves.forEach((leave) => {
         if (stats[leave.type] !== undefined) {
-          stats[leave.type] += 1;
+          stats[leave.type] += 1; // individual count shows as 1 per entry
         }
       });
 
-      const totalTaken = yearLeaves.length;
+      const totalTaken = yearLeaves.reduce((acc, leave) => acc + (leave.type === 'Half Day' ? 0.5 : 1), 0);
 
       // Create a new workbook
       const wb = XLSX.utils.book_new();
@@ -355,6 +361,7 @@ export const exportService = {
         ['Casual', stats.Casual],
         ['Vacation', stats.Vacation],
         ['Duty', stats.Duty],
+        ['Half Day', stats['Half Day']],
         [],
         ['TOTAL LEAVE TAKEN', totalTaken],
       ];

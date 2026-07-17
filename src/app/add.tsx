@@ -304,7 +304,7 @@ export default function AddLeaveScreen({ isModal = false, onClose, modalEditId, 
         <View style={styles.inputGroup}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>Leave Type</Text>
           <View style={styles.typeGrid}>
-            {(['Casual', 'Vacation', 'Duty'] as LeaveType[]).map((t) => {
+            {(['Casual', 'Vacation', 'Duty', 'Half Day'] as LeaveType[]).map((t) => {
               const isSelected = type === t;
               const typeColor = LeaveTypeColors[t];
               

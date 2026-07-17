@@ -35,14 +35,15 @@ export default function ReportsScreen() {
       Casual: 0,
       Vacation: 0,
       Duty: 0,
+      'Half Day': 0,
     };
 
     let totalTaken = 0;
 
     selectedYearLeaves.forEach((leave) => {
-      totalTaken += 1; // each record represents 1 day
+      totalTaken += leave.type === 'Half Day' ? 0.5 : 1; // counts as 0.5 days
       if (countByType[leave.type] !== undefined) {
-        countByType[leave.type] += 1;
+        countByType[leave.type] += 1; // counts as 1 entry
       }
     });
 
@@ -150,7 +151,7 @@ export default function ReportsScreen() {
           {/* Breakdown items */}
           <Text style={[styles.breakdownTitle, { color: colors.textSecondary }]}>Breakdown by Leave Type</Text>
           <View style={styles.breakdownGrid}>
-            {(['Casual', 'Vacation', 'Duty'] as LeaveType[]).map((type) => {
+            {(['Casual', 'Vacation', 'Duty', 'Half Day'] as LeaveType[]).map((type) => {
               const count = stats.countByType[type] || 0;
               const typeColor = LeaveTypeColors[type];
               
@@ -168,7 +169,7 @@ export default function ReportsScreen() {
                     </Text>
                   </View>
                   <Text style={[styles.breakdownValue, { color: colors.text, fontWeight: count > 0 ? '700' : '400', flexShrink: 0 }]}>
-                    {count} {count === 1 ? 'day' : 'days'}
+                    {count} {type === 'Half Day' ? (count === 1 ? 'half day' : 'half days') : (count === 1 ? 'day' : 'days')}
                   </Text>
                 </View>
               );

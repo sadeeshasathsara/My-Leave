@@ -1,17 +1,16 @@
-import { StyleSheet, View, Text, TextInput, ScrollView, Pressable, useColorScheme, ActivityIndicator, Alert, Linking } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { useLeaveStore } from '../storage/store';
-import { backupService } from '../services/backup';
-import { Colors, Spacing, BorderRadius } from '../constants/theme';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { fs } from '../constants/layout';
-import { GoogleUser } from '../types';
+import { BorderRadius, Colors, Spacing } from '../constants/theme';
+import { backupService } from '../services/backup';
+import { useLeaveStore } from '../storage/store';
 
 export default function SettingsScreen() {
   const systemScheme = useColorScheme();
-  
+
   // Zustand Store
   const leaves = useLeaveStore((state) => state.leaves);
   const settings = useLeaveStore((state) => state.settings);
@@ -113,7 +112,7 @@ export default function SettingsScreen() {
             try {
               const payload = await backupService.restoreFromGoogleDrive(googleUser);
               restoreFromBackup(payload.leaves, payload.settings);
-              
+
               // Sync text inputs
               setName(payload.settings.userName);
               setEmail(payload.settings.email);
@@ -151,7 +150,7 @@ export default function SettingsScreen() {
             try {
               const payload = await backupService.importLocalBackup();
               restoreFromBackup(payload.leaves, payload.settings);
-              
+
               // Sync inputs
               setName(payload.settings.userName);
               setEmail(payload.settings.email);
@@ -172,8 +171,8 @@ export default function SettingsScreen() {
       'This will disconnect your account, delete all local leave logs, and reset all app states. This action is permanent. Do you want to proceed?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign Out & Reset', 
+        {
+          text: 'Sign Out & Reset',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -207,11 +206,11 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        
+
         {/* Profile Details Card */}
         <View style={[styles.card, colors.cardShadow, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>Profile & Info</Text>
-          
+
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Full Name</Text>
             <TextInput
@@ -235,7 +234,7 @@ export default function SettingsScreen() {
             />
           </View>
 
-          <Pressable 
+          <Pressable
             style={[styles.saveBtn, { backgroundColor: colors.primary }]}
             onPress={handleSaveProfile}
           >
@@ -258,7 +257,7 @@ export default function SettingsScreen() {
                   key={mode}
                   style={[
                     styles.themeOption,
-                    { 
+                    {
                       backgroundColor: isSelected ? colors.primary : colors.divider,
                     }
                   ]}
@@ -283,18 +282,15 @@ export default function SettingsScreen() {
           {/* Account Status */}
           {googleUser ? (
             <View style={[styles.accountConnectedBox, { backgroundColor: colors.divider }]}>
-              {googleUser.photoUrl ? (
-                <Image source={{ uri: googleUser.photoUrl }} style={styles.userPhoto} />
-              ) : (
-                <View style={[styles.userPhotoFallback, { backgroundColor: colors.primary }]}>
-                  <Ionicons name="person" size={16} color="#ffffff" />
-                </View>
-              )}
+              <Image
+                source={googleUser.photoUrl ? { uri: googleUser.photoUrl } : require('../../assets/images/default_avatar.png')}
+                style={styles.userPhoto}
+              />
               <View style={[styles.userDetails, { flex: 1, marginRight: Spacing.sm }]}>
                 <Text style={[styles.userNameText, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>{googleUser.name}</Text>
                 <Text style={[styles.userEmailText, { color: colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>{googleUser.email}</Text>
               </View>
-              <Pressable 
+              <Pressable
                 style={[styles.disconnectBtn, { borderColor: colors.border, flexShrink: 0 }]}
                 onPress={handleGoogleLogin}
               >
@@ -302,7 +298,7 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
           ) : (
-            <Pressable 
+            <Pressable
               style={[styles.googleLoginBtn, { borderColor: colors.border }]}
               onPress={handleGoogleLogin}
               disabled={isLoggingIn}
@@ -311,8 +307,8 @@ export default function SettingsScreen() {
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
                 <>
-                  <Ionicons name="logo-google" size={18} color={colors.primary} />
-                  <Text style={[styles.googleLoginBtnText, { color: colors.text }]}>Connect Google Account</Text>
+                  <Image source={require('../../assets/images/google_drive_logo.png')} style={{ width: 20, height: 20 }} />
+                  <Text style={[styles.googleLoginBtnText, { color: colors.text }]}>Connect Google Drive</Text>
                 </>
               )}
             </Pressable>
@@ -330,7 +326,7 @@ export default function SettingsScreen() {
                       key={freq}
                       style={[
                         styles.themeOption,
-                        { 
+                        {
                           backgroundColor: isSelected ? colors.primary : colors.divider,
                         }
                       ]}
@@ -350,7 +346,7 @@ export default function SettingsScreen() {
           <View style={styles.backupActionsRow}>
             <Pressable
               style={[
-                styles.backupBtn, 
+                styles.backupBtn,
                 { backgroundColor: colors.primary },
                 (!googleUser || isSyncing || isRestoring) && { opacity: 0.5 }
               ]}
@@ -369,7 +365,7 @@ export default function SettingsScreen() {
 
             <Pressable
               style={[
-                styles.backupBtn, 
+                styles.backupBtn,
                 { backgroundColor: colors.primary },
                 (!googleUser || isSyncing || isRestoring) && { opacity: 0.5 }
               ]}
@@ -403,7 +399,7 @@ export default function SettingsScreen() {
           </Text>
 
           <View style={styles.localBackupRow}>
-            <Pressable 
+            <Pressable
               style={[styles.localBtn, { backgroundColor: colors.divider }]}
               onPress={handleLocalBackup}
             >
@@ -411,7 +407,7 @@ export default function SettingsScreen() {
               <Text style={[styles.localBtnText, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>Export JSON File</Text>
             </Pressable>
 
-            <Pressable 
+            <Pressable
               style={[styles.localBtn, { backgroundColor: colors.divider }]}
               onPress={handleLocalRestore}
             >
@@ -428,7 +424,7 @@ export default function SettingsScreen() {
             Sign out of Google Drive and completely wipe all local leave logs
           </Text>
 
-          <Pressable 
+          <Pressable
             style={[styles.dangerBtn, { backgroundColor: colors.accent + '15', borderColor: colors.accent }]}
             onPress={handleLogout}
           >
@@ -437,49 +433,20 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
-        {/* Developer Details Card */}
-        <View style={[styles.card, colors.cardShadow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Developer Info</Text>
-          <Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>
-            Get in touch with the app developer
-          </Text>
-
-          <View style={styles.devContainer}>
-            <Pressable 
-              style={[styles.devItem, { borderBottomColor: colors.divider }]}
-              onPress={handleDevWebsite}
-            >
-              <View style={[styles.devIconBox, { backgroundColor: colors.primary + '12' }]}>
-                <Ionicons name="person-outline" size={18} color={colors.primary} />
-              </View>
-              <View style={styles.devDetails}>
-                <Text style={[styles.devLabel, { color: colors.textMuted }]}>Developer</Text>
-                <Text style={[styles.devValue, { color: colors.text }]}>Sadeesha Sathsara Kumbukage</Text>
-              </View>
-              <Ionicons name="open-outline" size={16} color={colors.textSecondary} />
-            </Pressable>
-
-            <Pressable 
-              style={styles.devItem}
-              onPress={handleDevEmail}
-            >
-              <View style={[styles.devIconBox, { backgroundColor: colors.primary + '12' }]}>
-                <Ionicons name="mail-outline" size={18} color={colors.primary} />
-              </View>
-              <View style={styles.devDetails}>
-                <Text style={[styles.devLabel, { color: colors.textMuted }]}>Email</Text>
-                <Text style={[styles.devValue, { color: colors.text }]}>sathsarakumbukage@gmail.com</Text>
-              </View>
-              <Ionicons name="mail-open-outline" size={16} color={colors.textSecondary} />
-            </Pressable>
-          </View>
-        </View>
-
         {/* App Info Footer */}
         <View style={styles.appInfoContainer}>
           <Text style={[styles.appNameText, { color: colors.text }]}>Personal Leave Tracker</Text>
-          <Text style={[styles.appVersionText, { color: colors.textMuted }]}>Version 1.0.0 (Build 57)</Text>
-          <Text style={[styles.appVersionText, { color: colors.textMuted }]}>100% Offline-First SQLite Database</Text>
+          <Text style={[styles.appVersionText, { color: colors.textMuted }]}>Version 2.0.5</Text>
+          
+          <Text style={[styles.appVersionText, { color: colors.textMuted, marginTop: Spacing.md }]}>
+            Developer: Sadeesha Sathsara Kumbukage
+          </Text>
+          <Pressable onPress={handleDevEmail} style={styles.devLinkPressable}>
+            <Text style={[styles.appVersionText, { color: colors.primary }]}>sathsarakumbukage@gmail.com</Text>
+          </Pressable>
+          <Pressable onPress={handleDevWebsite} style={styles.devLinkPressable}>
+            <Text style={[styles.appVersionText, { color: colors.primary }]}>sadeeshasathsara.me</Text>
+          </Pressable>
         </View>
 
       </ScrollView>
@@ -678,6 +645,9 @@ const styles = StyleSheet.create({
   },
   appVersionText: {
     fontSize: fs(11),
+  },
+  devLinkPressable: {
+    marginTop: 4,
   },
   devContainer: {
     marginTop: Spacing.xs,

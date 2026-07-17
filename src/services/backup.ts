@@ -38,12 +38,17 @@ let isGoogleConfigured = false;
 function ensureGoogleConfigured() {
   if (isNativeGoogleSupported && !isGoogleConfigured && GoogleSignin) {
     try {
-      GoogleSignin.configure({
+      const config: any = {
         scopes: ['https://www.googleapis.com/auth/drive.appdata'],
-        webClientId: GOOGLE_WEB_CLIENT_ID || undefined,
-        iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
         offlineAccess: true,
-      });
+      };
+      if (GOOGLE_WEB_CLIENT_ID && !GOOGLE_WEB_CLIENT_ID.includes('YOUR_')) {
+        config.webClientId = GOOGLE_WEB_CLIENT_ID;
+      }
+      if (GOOGLE_IOS_CLIENT_ID && !GOOGLE_IOS_CLIENT_ID.includes('YOUR_')) {
+        config.iosClientId = GOOGLE_IOS_CLIENT_ID;
+      }
+      GoogleSignin.configure(config);
       isGoogleConfigured = true;
     } catch (err) {
       console.error('[BackupService] Failed to configure Google Sign-In, switching to simulation:', err);

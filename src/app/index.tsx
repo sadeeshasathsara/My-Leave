@@ -1,6 +1,7 @@
 import { StyleSheet, View, Text, ScrollView, Pressable, useColorScheme, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState, useCallback } from 'react';
 import { useLeaveStore } from '../storage/store';
@@ -82,10 +83,14 @@ export default function DashboardScreen() {
             </Text>
           </View>
           <Pressable
-            style={[styles.profileButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+            style={[styles.profileButton, { backgroundColor: colors.card, borderColor: colors.border, overflow: 'hidden' }]}
             onPress={() => router.push('/settings')}
           >
-            <Ionicons name="person" size={20} color={colors.primary} />
+            <Image 
+              source={settings.googleUser?.photoUrl ? { uri: settings.googleUser.photoUrl } : require('../../assets/images/default_avatar.png')} 
+              style={styles.profileImage}
+              contentFit="cover"
+            />
           </Pressable>
         </View>
 
@@ -131,6 +136,18 @@ export default function DashboardScreen() {
               Duty
             </Text>
           </View>
+
+          <View style={[styles.summaryCard, colors.cardShadow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.summaryIconContainer, { backgroundColor: LeaveTypeColors['Half Day'] + '15' }]}>
+              <Ionicons name="time-outline" size={18} color={LeaveTypeColors['Half Day']} />
+            </View>
+            <Text style={[styles.summaryValue, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+              {monthStats['Half Day']}
+            </Text>
+            <Text style={[styles.summaryLabel, { color: colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
+              Half Day
+            </Text>
+          </View>
         </View>
 
         {/* Yearly Summary Card — tied to selectedYear from top bar */}
@@ -147,7 +164,7 @@ export default function DashboardScreen() {
                 <Text style={[styles.statsLabel, { color: colors.text }]}>Casual Leave</Text>
               </View>
               <Text style={[styles.statsValue, { color: colors.text }]}>
-                {yearlyStats.byType.Casual || 0} {yearlyStats.byType.Casual === 1 ? 'day' : 'days'}
+                {yearlyStats.byType.Casual || 0}
               </Text>
             </View>
 
@@ -157,17 +174,27 @@ export default function DashboardScreen() {
                 <Text style={[styles.statsLabel, { color: colors.text }]}>Vacation Leave</Text>
               </View>
               <Text style={[styles.statsValue, { color: colors.text }]}>
-                {yearlyStats.byType.Vacation || 0} {yearlyStats.byType.Vacation === 1 ? 'day' : 'days'}
+                {yearlyStats.byType.Vacation || 0}
               </Text>
             </View>
 
-            <View style={[styles.statsRow, { borderBottomColor: 'transparent' }]}>
+            <View style={[styles.statsRow, { borderBottomColor: colors.divider }]}>
               <View style={styles.statsRowLeft}>
                 <View style={[styles.typeDot, { backgroundColor: LeaveTypeColors.Duty }]} />
                 <Text style={[styles.statsLabel, { color: colors.text }]}>Duty Leave</Text>
               </View>
               <Text style={[styles.statsValue, { color: colors.text }]}>
-                {yearlyStats.byType.Duty || 0} {yearlyStats.byType.Duty === 1 ? 'day' : 'days'}
+                {yearlyStats.byType.Duty || 0}
+              </Text>
+            </View>
+
+            <View style={[styles.statsRow, { borderBottomColor: 'transparent' }]}>
+              <View style={styles.statsRowLeft}>
+                <View style={[styles.typeDot, { backgroundColor: LeaveTypeColors['Half Day'] }]} />
+                <Text style={[styles.statsLabel, { color: colors.text }]}>Half Day Leave</Text>
+              </View>
+              <Text style={[styles.statsValue, { color: colors.text }]}>
+                {yearlyStats.byType['Half Day'] || 0}
               </Text>
             </View>
           </View>
@@ -176,43 +203,12 @@ export default function DashboardScreen() {
           <View style={[styles.totalRow, { borderTopColor: colors.divider, backgroundColor: colors.primary + '08' }]}>
             <Text style={[styles.totalLabel, { color: colors.textSecondary }]}>Total</Text>
             <Text style={[styles.totalValue, { color: colors.primary }]}>
-              {yearlyStats.totalTakenThisYear} {yearlyStats.totalTakenThisYear === 1 ? 'day' : 'days'}
+              {yearlyStats.totalTakenThisYear}
             </Text>
           </View>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.quickActionsContainer}>
-          <Pressable
-            style={[styles.actionButton, colors.cardShadow, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => setAddLeaveModalOpen(true, null)}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: '#6366f115' }]}>
-              <Ionicons name="add" size={22} color="#6366f1" />
-            </View>
-            <Text style={[styles.actionText, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>Add Leave</Text>
-          </Pressable>
 
-          <Pressable
-            style={[styles.actionButton, colors.cardShadow, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => router.push('/calendar')}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: '#f59e0b15' }]}>
-              <Ionicons name="calendar-outline" size={20} color="#f59e0b" />
-            </View>
-            <Text style={[styles.actionText, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>Calendar</Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.actionButton, colors.cardShadow, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => router.push('/reports')}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: '#10b98115' }]}>
-              <Ionicons name="document-text-outline" size={20} color="#10b981" />
-            </View>
-            <Text style={[styles.actionText, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>Reports</Text>
-          </Pressable>
-        </View>
 
         {/* Recent Leave Entries */}
         <View style={styles.sectionHeader}>
@@ -297,6 +293,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarFallback: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   monthSubtitle: {
     fontSize: fs(11),

@@ -1,275 +1,330 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, 
   View, 
   Text, 
-  TextInput, 
   Pressable, 
   ActivityIndicator, 
-  Alert, 
   useColorScheme, 
-  KeyboardAvoidingView, 
-  Platform,
-  ScrollView
+  Animated,
+  Easing
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Colors, Spacing, BorderRadius } from '../constants/theme';
-import { fs, SCREEN_WIDTH } from '../constants/layout';
+import { fs } from '../constants/layout';
 import { GoogleUser, LeaveRecord, UserSettings } from '../types';
-import { useLeaveStore } from '../storage/store';
 import { backupService } from '../services/backup';
+import { useLeaveStore } from '../storage/store';
 
 interface OnboardingProps {
-  onComplete: (userData: { userName: string; email: string; googleUser: GoogleUser | null; backupEnabled: boolean }, restoreData?: { leaves: LeaveRecord[]; settings: UserSettings }) => void;
+  onComplete: (
+    userData: { userName: string; email: string; googleUser: GoogleUser | null; backupEnabled: boolean }, 
+    restoreData?: { leaves: LeaveRecord[]; settings: UserSettings }
+  ) => void;
 }
+
+type SetupPhase = 
+  | 'idle'
+  | 'authenticating'
+  | 'connecting'
+  | 'scanning'
+  | 'restoring_data'
+  | 'fresh_profile'
+  | 'finalizing'
+  | 'done';
 
 export default function OnboardingScreen({ onComplete }: OnboardingProps) {
   const systemScheme = useColorScheme();
   const colors = Colors[systemScheme === 'dark' ? 'dark' : 'light'];
 
-  const [step, setStep] = useState<1 | 2>(1);
-  const [userName, setUserName] = useState('');
-  const [email, setEmail] = useState('');
-  const [googleUser, setGoogleUser] = useState<GoogleUser | null>(null);
-  
-  // Async states
-  const [loading, setLoading] = useState(false);
-  const [backupCheckResult, setBackupCheckResult] = useState<{ leaves: LeaveRecord[]; settings: UserSettings } | null>(null);
-  const [showBackupAlert, setShowBackupAlert] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
+  const [step, setStep] = useState<'welcome' | 'processing'>('welcome');
+  const [phase, setPhase] = useState<SetupPhase>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleNextStep = () => {
-    if (!userName.trim()) {
-      useLeaveStore.getState().showToast('Required', 'Please enter your name to proceed.', 'warning');
+  // Animation values
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  // Pulse animation for cloud icon
+  useEffect(() => {
+    if (step === 'processing') {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.15,
+            duration: 1000,
+            useNativeDriver: true,
+            easing: Easing.inOut(Easing.ease),
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1.0,
+            duration: 1000,
+            useNativeDriver: true,
+            easing: Easing.inOut(Easing.ease),
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [step]);
+
+  // Rotation animation for spinner
+  useEffect(() => {
+    if (step === 'processing') {
+      const rotate = Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+          easing: Easing.linear,
+        })
+      );
+      rotate.start();
+      return () => rotate.stop();
+    }
+  }, [step]);
+
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const handleSignIn = async () => {
+    setErrorMessage(null);
+    setStep('processing');
+    
+    // Phase 1: Authenticate
+    setPhase('authenticating');
+    let user: GoogleUser;
+    try {
+      user = await backupService.signInWithGoogle();
+    } catch (err) {
+      console.error('[Onboarding] Sign-in failure:', err);
+      setStep('welcome');
+      setPhase('idle');
+      useLeaveStore.getState().showToast('Authentication Failed', 'Google authentication could not be completed.', 'error');
       return;
     }
-    setStep(2);
-  };
 
-  const handleConnectGoogle = async () => {
-    setLoading(true);
-    setStatusMessage('Connecting to Google Drive...');
+    // Phase 2: Connecting to Drive
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    setPhase('connecting');
+
+    // Phase 3: Scanning cloud storage
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    setPhase('scanning');
+
     try {
-      const user = await backupService.signInWithGoogle();
-      setGoogleUser(user);
-      setStatusMessage('Checking for backups...');
+      const backup = await backupService.restoreFromGoogleDrive(user);
       
-      try {
-        const backup = await backupService.restoreFromGoogleDrive(user);
-        setBackupCheckResult(backup);
-        setLoading(false);
-        setShowBackupAlert(true);
-      } catch (err) {
-        // No backup found, just complete onboarding
-        setLoading(false);
-        setStatusMessage('No backup found. Starting fresh!');
-        setTimeout(() => {
-          onComplete({
-            userName: userName.trim(),
-            email: email.trim() || user.email,
-            googleUser: user,
-            backupEnabled: true
-          });
-        }, 1200);
-      }
-    } catch (err) {
-      setLoading(false);
-      setStatusMessage('');
-      useLeaveStore.getState().showToast('Connection Failed', 'Could not authenticate with Google.', 'error');
-    }
-  };
+      // Phase 4: Restoring data (backup found!)
+      setPhase('restoring_data');
+      
+      // Progress animation
+      Animated.timing(progressAnim, {
+        toValue: 1,
+        duration: 1500,
+        useNativeDriver: false,
+        easing: Easing.out(Easing.ease),
+      }).start();
 
-  const handleRestoreBackup = () => {
-    if (backupCheckResult) {
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+
+      // Phase 5: Finalizing
+      setPhase('finalizing');
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      
+      // Done
+      setPhase('done');
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      // Complete restoration
       onComplete({
-        userName: backupCheckResult.settings.userName,
-        email: backupCheckResult.settings.email,
-        googleUser,
-        backupEnabled: true
-      }, backupCheckResult);
+        userName: backup.settings.userName,
+        email: backup.settings.email,
+        googleUser: user,
+        backupEnabled: true,
+      }, backup);
+
+    } catch (err) {
+      // Backup not found or restore failed
+      console.log('[Onboarding] No prior backup found. Creating fresh profile.', err);
+
+      // Phase 4: Fresh Profile (no backup found)
+      setPhase('fresh_profile');
+      
+      Animated.timing(progressAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: false,
+        easing: Easing.out(Easing.ease),
+      }).start();
+
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      // Phase 5: Finalizing
+      setPhase('finalizing');
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      // Done
+      setPhase('done');
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      // Complete fresh setup
+      onComplete({
+        userName: user.name,
+        email: user.email,
+        googleUser: user,
+        backupEnabled: true,
+      });
     }
   };
 
-  const handleStartFresh = () => {
-    onComplete({
-      userName: userName.trim(),
-      email: email.trim(),
-      googleUser,
-      backupEnabled: true
-    });
-  };
-
-  const handleSkipGoogle = () => {
-    onComplete({
-      userName: userName.trim(),
-      email: email.trim(),
-      googleUser: null,
-      backupEnabled: false
-    });
+  const getPhaseText = () => {
+    switch (phase) {
+      case 'authenticating':
+        return 'Authenticating with Google...';
+      case 'connecting':
+        return 'Connecting to Google Drive...';
+      case 'scanning':
+        return 'Scanning cloud app data space...';
+      case 'restoring_data':
+        return 'Prior backup found! Restoring leave logs...';
+      case 'fresh_profile':
+        return 'No backup found. Creating new workspace...';
+      case 'finalizing':
+        return 'Syncing database configurations...';
+      case 'done':
+        return 'All set! Launching My Leaves...';
+      default:
+        return 'Initializing...';
+    }
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Header Progress Indicators */}
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressIndicator, { backgroundColor: colors.primary }]} />
-            <View style={[styles.progressIndicator, { backgroundColor: step === 2 ? colors.primary : colors.divider }]} />
+      {step === 'welcome' ? (
+        <View style={styles.welcomeWrapper}>
+          {/* Top Logo and Title Section */}
+          <View style={styles.logoContainer}>
+            <View style={[styles.logoShadowWrapper, colors.cardShadow]}>
+              <Image 
+                source={require('../../assets/images/app-logo.png')} 
+                style={styles.logoImage}
+              />
+            </View>
+            <Text style={[styles.title, { color: colors.text }]}>My Leaves</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              Securely track your annual leave allocations, manage entries offline, and maintain automatic cloud backups in Google Drive.
+            </Text>
           </View>
 
-          {step === 1 ? (
-            <View style={styles.stepWrapper}>
-              <View style={styles.iconHeaderContainer}>
-                <View style={[styles.iconWrapper, { backgroundColor: colors.primaryLight + '30' }]}>
-                  <Ionicons name="sparkles" size={32} color={colors.primary} />
-                </View>
-                <Text style={[styles.title, { color: colors.text }]}>Welcome to My Leave</Text>
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                  Keep track of your annual allocations, log leaves offline, and export HR-ready compliance reports.
+          {/* Premium Features List */}
+          <View style={styles.featuresContainer}>
+            <View style={styles.featureItem}>
+              <View style={[styles.featureIcon, { backgroundColor: colors.primary + '15' }]}>
+                <Ionicons name="cloud-offline-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.featureTextWrapper}>
+                <Text style={[styles.featureTitle, { color: colors.text }]}>100% Offline-First</Text>
+                <Text style={[styles.featureDescription, { color: colors.textMuted }]}>
+                  Your data stays on your device. Fast, private, and works completely without internet.
                 </Text>
               </View>
+            </View>
 
-              <View style={[styles.card, colors.cardShadow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Set Up Your Profile</Text>
-                
-                <View style={styles.inputGroup}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Full Name</Text>
-                  <TextInput
-                    placeholder="Enter your name"
-                    placeholderTextColor={colors.textMuted}
-                    value={userName}
-                    onChangeText={setUserName}
-                    style={[styles.textInput, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }]}
-                  />
-                </View>
+            <View style={styles.featureItem}>
+              <View style={[styles.featureIcon, { backgroundColor: '#0f9d5815' }]}>
+                <Ionicons name="sync-outline" size={20} color="#0f9d58" />
+              </View>
+              <View style={styles.featureTextWrapper}>
+                <Text style={[styles.featureTitle, { color: colors.text }]}>Google Drive Sync</Text>
+                <Text style={[styles.featureDescription, { color: colors.textMuted }]}>
+                  Automatic isolated cloud backups in Google AppData folder. Restores instantly.
+                </Text>
+              </View>
+            </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Email Address (Optional)</Text>
-                  <TextInput
-                    placeholder="Enter your email"
-                    placeholderTextColor={colors.textMuted}
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    style={[styles.textInput, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }]}
-                  />
-                </View>
+            <View style={styles.featureItem}>
+              <View style={[styles.featureIcon, { backgroundColor: '#f4b40015' }]}>
+                <Ionicons name="shield-checkmark-outline" size={20} color="#f4b400" />
+              </View>
+              <View style={styles.featureTextWrapper}>
+                <Text style={[styles.featureTitle, { color: colors.text }]}>Private & Secure</Text>
+                <Text style={[styles.featureDescription, { color: colors.textMuted }]}>
+                  We do not run servers or store passwords. Your cloud backups belong solely to you.
+                </Text>
+              </View>
+            </View>
+          </View>
 
-                <Pressable
+          {/* Action Button Section */}
+          <View style={styles.actionContainer}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.googleBtn,
+                { backgroundColor: colors.primary },
+                pressed && { opacity: 0.9 }
+              ]}
+              onPress={handleSignIn}
+            >
+              <Ionicons name="logo-google" size={20} color="#ffffff" />
+              <Text style={styles.googleBtnText}>Continue with Google</Text>
+            </Pressable>
+            
+            <Text style={[styles.termsText, { color: colors.textMuted }]}>
+              By continuing, you authorize My Leaves to access isolated sandboxed application data on your Google Drive.
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.processingWrapper}>
+          {/* Animated Sync Visuals */}
+          <View style={styles.animationContainer}>
+            <Animated.View style={[styles.outerRing, { borderColor: colors.primary + '20', transform: [{ scale: pulseAnim }] }]}>
+              <Animated.View style={[styles.innerRing, { backgroundColor: colors.primary + '08' }]}>
+                <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                  <Ionicons name="cloud-upload-outline" size={60} color={colors.primary} />
+                </Animated.View>
+              </Animated.View>
+            </Animated.View>
+            
+            {/* Spinning Indicator */}
+            <Animated.View style={[styles.spinner, { transform: [{ rotate: spin }] }]}>
+              <Ionicons name="sync" size={24} color={colors.primary} />
+            </Animated.View>
+          </View>
+
+          {/* Status Updates */}
+          <View style={styles.statusContainer}>
+            <Text style={[styles.statusTitle, { color: colors.text }]}>Syncing Workspace</Text>
+            <Text style={[styles.statusSubtitle, { color: colors.textSecondary }]}>{getPhaseText()}</Text>
+            
+            {/* Progress bar */}
+            {(phase === 'restoring_data' || phase === 'fresh_profile' || phase === 'finalizing' || phase === 'done') && (
+              <View style={[styles.progressTrack, { backgroundColor: colors.divider }]}>
+                <Animated.View 
                   style={[
-                    styles.primaryButton, 
-                    { backgroundColor: colors.primary },
-                    !userName.trim() && { opacity: 0.6 }
-                  ]}
-                  onPress={handleNextStep}
-                  disabled={!userName.trim()}
-                >
-                  <Text style={styles.buttonText}>Next</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#ffffff" />
-                </Pressable>
+                    styles.progressBar, 
+                    { 
+                      backgroundColor: colors.primary,
+                      width: progressAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0%', '100%'],
+                      })
+                    }
+                  ]} 
+                />
               </View>
-            </View>
-          ) : (
-            <View style={styles.stepWrapper}>
-              <View style={styles.iconHeaderContainer}>
-                <View style={[styles.iconWrapper, { backgroundColor: '#10b98120' }]}>
-                  <Ionicons name="cloud-done-outline" size={32} color="#10b981" />
-                </View>
-                <Text style={[styles.title, { color: colors.text }]}>Cloud Storage Backup</Text>
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                  Securely link your Google account to back up data offline and restore existing logs from other devices.
-                </Text>
-              </View>
-
-              <View style={[styles.card, colors.cardShadow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                {loading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={colors.primary} />
-                    <Text style={[styles.loadingText, { color: colors.text }]}>{statusMessage}</Text>
-                  </View>
-                ) : showBackupAlert ? (
-                  <View style={styles.backupContainer}>
-                    <Ionicons name="cloud-download-outline" size={44} color={colors.primary} style={{ marginBottom: Spacing.md }} />
-                    <Text style={[styles.backupTitle, { color: colors.text }]}>Existing Backup Found</Text>
-                    <Text style={[styles.backupText, { color: colors.textSecondary }]}>
-                      We discovered a prior leave history logged under this account. Would you like to restore it now?
-                    </Text>
-
-                    <Pressable
-                      style={[styles.primaryButton, { backgroundColor: colors.primary, width: '100%', marginBottom: Spacing.sm }]}
-                      onPress={handleRestoreBackup}
-                    >
-                      <Ionicons name="refresh-circle" size={18} color="#ffffff" />
-                      <Text style={styles.buttonText}>Restore My Data</Text>
-                    </Pressable>
-
-                    <Pressable
-                      style={[styles.outlineButton, { borderColor: colors.border, width: '100%' }]}
-                      onPress={handleStartFresh}
-                    >
-                      <Text style={[styles.outlineButtonText, { color: colors.textSecondary }]}>Start Fresh</Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View style={styles.backupContainer}>
-                    {googleUser ? (
-                      <View style={styles.accountCard}>
-                        <Ionicons name="checkmark-circle" size={24} color="#10b981" />
-                        <Text style={[styles.accountEmail, { color: colors.text }]}>{googleUser.email}</Text>
-                        <Text style={[styles.accountStatus, { color: colors.textMuted }]}>{statusMessage || 'Connected successfully'}</Text>
-                      </View>
-                    ) : (
-                      <>
-                        <Pressable
-                          style={[styles.googleButton, { borderColor: colors.border }]}
-                          onPress={handleConnectGoogle}
-                        >
-                          <Ionicons name="logo-google" size={20} color={colors.primary} />
-                          <Text style={[styles.googleButtonText, { color: colors.text }]}>Link Google Drive</Text>
-                        </Pressable>
-                        <Text style={[styles.infoLabel, { color: colors.textMuted }]}>
-                          Uses isolated AppData sandboxed space.
-                        </Text>
-                      </>
-                    )}
-
-                    <View style={styles.buttonSpacer} />
-
-                    <View style={styles.footerButtons}>
-                      <Pressable
-                        style={[styles.skipButton]}
-                        onPress={handleSkipGoogle}
-                      >
-                        <Text style={[styles.skipText, { color: colors.textMuted }]}>Skip & Start Fresh</Text>
-                      </Pressable>
-
-                      {googleUser && (
-                        <Pressable
-                          style={[styles.primaryButton, { backgroundColor: colors.primary }]}
-                          onPress={handleStartFresh}
-                        >
-                          <Text style={styles.buttonText}>Finish</Text>
-                          <Ionicons name="checkmark" size={16} color="#ffffff" />
-                        </Pressable>
-                      )}
-                    </View>
-                  </View>
-                )}
-              </View>
-            </View>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
+            )}
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -278,41 +333,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContainer: {
-    flexGrow: 1,
+  welcomeWrapper: {
+    flex: 1,
     padding: Spacing.xl,
-    justifyContent: 'center',
-    paddingBottom: 40,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.xxl,
-  },
-  progressIndicator: {
-    height: 6,
-    width: 32,
-    borderRadius: BorderRadius.round,
-  },
-  stepWrapper: {
-    gap: Spacing.xxl,
-  },
-  iconHeaderContainer: {
+    justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginTop: Spacing.xl,
     gap: Spacing.md,
   },
-  iconWrapper: {
-    width: 68,
-    height: 68,
+  logoShadowWrapper: {
+    width: 90,
+    height: 90,
     borderRadius: BorderRadius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
+    elevation: 8,
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   title: {
-    fontSize: fs(24),
+    fontSize: fs(28),
     fontWeight: '800',
-    textAlign: 'center',
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: fs(13),
@@ -320,137 +366,131 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: Spacing.md,
   },
-  card: {
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.xl,
-    borderWidth: 1,
+  featuresContainer: {
+    width: '100%',
+    gap: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
+    marginVertical: Spacing.xl,
   },
-  cardTitle: {
-    fontSize: fs(16),
-    fontWeight: '700',
-    marginBottom: Spacing.lg,
-    textAlign: 'center',
-  },
-  inputGroup: {
-    marginBottom: Spacing.md,
-  },
-  label: {
-    fontSize: fs(11),
-    fontWeight: '700',
-    marginBottom: Spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  textInput: {
-    height: 48,
-    borderWidth: 1,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    fontSize: fs(14),
-  },
-  primaryButton: {
+  featureItem: {
     flexDirection: 'row',
-    height: 48,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: fs(14),
-    fontWeight: '700',
-  },
-  loadingContainer: {
-    paddingVertical: Spacing.xxxl,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.md,
   },
-  loadingText: {
-    fontSize: fs(13),
-    fontWeight: '500',
-    marginTop: Spacing.sm,
-  },
-  backupContainer: {
+  featureIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
+    justifyContent: 'center',
   },
-  backupTitle: {
-    fontSize: fs(18),
+  featureTextWrapper: {
+    flex: 1,
+    gap: 2,
+  },
+  featureTitle: {
+    fontSize: fs(14),
     fontWeight: '700',
-    marginBottom: Spacing.xs,
-    textAlign: 'center',
   },
-  backupText: {
+  featureDescription: {
     fontSize: fs(12),
     lineHeight: 16,
-    textAlign: 'center',
-    marginBottom: Spacing.xl,
-    paddingHorizontal: Spacing.sm,
   },
-  outlineButton: {
-    height: 48,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
+  actionContainer: {
+    width: '100%',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  googleBtn: {
+    flexDirection: 'row',
+    height: 52,
+    borderRadius: BorderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  outlineButtonText: {
-    fontSize: fs(14),
-    fontWeight: '600',
-  },
-  googleButton: {
-    flexDirection: 'row',
-    height: 48,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    width: '100%',
-    marginVertical: Spacing.md,
-  },
-  googleButtonText: {
-    fontSize: fs(14),
-    fontWeight: '600',
-  },
-  infoLabel: {
-    fontSize: fs(11),
-    textAlign: 'center',
-  },
-  accountCard: {
-    alignItems: 'center',
-    gap: Spacing.xs,
-    padding: Spacing.md,
-    width: '100%',
-  },
-  accountEmail: {
-    fontSize: fs(14),
-    fontWeight: '700',
-  },
-  accountStatus: {
-    fontSize: fs(12),
-  },
-  buttonSpacer: {
-    height: Spacing.xl,
-  },
-  footerButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     width: '100%',
     gap: Spacing.md,
+    elevation: 2,
   },
-  skipButton: {
+  googleBtnText: {
+    color: '#ffffff',
+    fontSize: fs(15),
+    fontWeight: '700',
+  },
+  termsText: {
+    fontSize: fs(11),
+    lineHeight: 15,
+    textAlign: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  processingWrapper: {
     flex: 1,
-    height: 48,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xxl,
   },
-  skipText: {
+  animationContainer: {
+    width: 200,
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.xxl,
+  },
+  outerRing: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  innerRing: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  spinner: {
+    position: 'absolute',
+    bottom: 25,
+    right: 25,
+    backgroundColor: '#ffffff',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  statusContainer: {
+    alignItems: 'center',
+    gap: Spacing.xs,
+    width: '100%',
+  },
+  statusTitle: {
+    fontSize: fs(18),
+    fontWeight: '800',
+  },
+  statusSubtitle: {
     fontSize: fs(13),
     fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  progressTrack: {
+    height: 6,
+    width: '80%',
+    borderRadius: BorderRadius.round,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: BorderRadius.round,
   },
 });
+

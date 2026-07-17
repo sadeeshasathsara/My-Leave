@@ -130,7 +130,7 @@ export function AnimatedSplashOverlay() {
 
         {/* App Title & Subtitle */}
         <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
-          <Text style={styles.title}>My Leave</Text>
+          <Text style={styles.title}>My Leaves</Text>
           <Text style={styles.subtitle}>Personal Leave Tracker</Text>
         </Animated.View>
 

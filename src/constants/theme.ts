@@ -50,6 +50,7 @@ export const LeaveTypeColors = {
   'Casual': '#f59e0b', // Amber
   'Vacation': '#6366f1', // Indigo
   'Duty': '#10b981', // Emerald
+  'Half Day': '#a855f7', // Purple/Violet
 } as const;
 
 export const Fonts = Platform.select({
